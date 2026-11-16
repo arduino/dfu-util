@@ -264,6 +264,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [build-dfu-util, test-dfu-util]
     if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
     permissions:
       contents: write
       id-token: write
