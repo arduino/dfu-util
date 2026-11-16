@@ -37,6 +37,9 @@ env:
   LIBUSB_SHA256: fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf
   LLVM_MINGW_VERSION: '20261020'
   LLVM_MINGW_SHA256: 55064b60b991a1e1e8090b8c2f84e82b22cfe5903d12c159d65064cf5e8ae335
+  AWS_REGION: us-east-1
+  AWS_PLUGIN_TARGET: /tools/dfu-util/
+  DIST_DIR: artifacts
 
 jobs:
   build-dfu-util:
@@ -256,6 +259,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+      id-token: write
 
     steps:
     - name: 'Check tag'
@@ -268,7 +272,7 @@ jobs:
     - name: 'Download artifacts'
       uses: actions/download-artifact@v4
       with:
-        path: artifacts/
+        path: ${{ env.DIST_DIR }}/
         pattern: 'dfu-util-*'
         merge-multiple: true
 
@@ -277,10 +281,19 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GH_REPO: ${{ github.repository }}
       run: |
-        cd artifacts
+        cd "${DIST_DIR}"
         sha256sum dfu-util-*.tar.gz > "dfu-util-${PROJECT_VERSION}.sha256"
         cat "dfu-util-${PROJECT_VERSION}.sha256"
         gh release create "${GITHUB_REF_NAME}" \
           --title "dfu-util ${PROJECT_VERSION}" \
           --notes "Built from dfu-util commit ${DFU_UTIL_COMMIT} with libusb ${LIBUSB_VERSION}." \
           ./*
+
+    - name: 'Configure AWS credentials'
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: 'Upload to downloads.arduino.cc'
+      run: aws s3 sync "${DIST_DIR}" "s3://${{ secrets.DOWNLOADS_BUCKET }}${AWS_PLUGIN_TARGET}"
